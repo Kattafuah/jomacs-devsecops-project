@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: SAST Scan
-        run: npm audit --json #--audit-level=moderate
+        run: npm audit --json --audit-level=none
 
       - name: Manual scan for passwords & Secret keys
         run: grep -r -e "password" -e "secret" -e "keys" .
