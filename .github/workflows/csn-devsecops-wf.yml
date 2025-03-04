@@ -32,7 +32,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: npm-audit-report
-          path: npm-audit-output.json
+          path: npm-audit-report.json
 
       - name: Manual scan for passwords & Secret keys
         run: grep -r -e "password" -e "secret" -e "keys" .
