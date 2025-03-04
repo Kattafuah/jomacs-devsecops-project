@@ -27,8 +27,17 @@ jobs:
       - name: SAST Scan
         run: npm audit --json --audit-level=none
 
+      - name: Upload NPM-audit Report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-audit-report
+          path: npm-audit-output/*.html
+
       - name: Manual scan for passwords & Secret keys
         run: grep -r -e "password" -e "secret" -e "keys" .
+
+
 
   #     # Install Docker Compose
   #     - name: Install Docker Compose
