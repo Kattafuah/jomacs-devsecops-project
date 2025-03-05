@@ -56,7 +56,7 @@ jobs:
       - name: Run OPA validation
         run: |
           mkdir -p opa-logs
-          ./ci-scripts/opa-validate.sh | tee opa-logs/opa-validation.log
+          ./ci-scripts/opa-validate.sh > opa-logs/opa-validation.log
 
       - name: Upload OPA Validation Logs
         if: always()
