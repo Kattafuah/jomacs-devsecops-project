@@ -43,6 +43,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Ensure script has executable permissions
+        run: chmod +x ./ci-scripts/opa-validate.sh
 
       - name: Install Open Policy Agent (OPA)
         run: |
