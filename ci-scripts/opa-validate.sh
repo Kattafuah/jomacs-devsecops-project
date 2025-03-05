@@ -16,7 +16,7 @@ opa eval --format=pretty --input eks-manifest-files/app.yaml --data ./opa-polici
         restrict_ports: data.k8sports.violation,
         deny_root: data.k8sroot.violation,
         readonly_volumes: data.k8svolumes.violation
-    }' > opa-logs/opa-validation.log
+    }' | tee opa-logs/opa-validation.log
 
 # Check if any violations exist
 if grep -q "violation" opa-logs/opa-validation.log; then
