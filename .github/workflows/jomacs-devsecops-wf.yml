@@ -38,7 +38,32 @@ jobs:
         run: grep -r -e "password" -e "secret" -e "keys" .
 
 
+  opa-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
+      - name: Install Open Policy Agent (OPA)
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
+
+      - name: Run OPA validation
+        run: |
+          mkdir -p opa-logs
+          ./ci-scripts/opa-validate.sh | tee opa-logs/opa-validation.log
+
+      - name: Upload OPA Validation Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opa-validation-logs
+          path: opa-logs/opa-validation.log
+
+
+          
   #     # Install Docker Compose
   #     - name: Install Docker Compose
   #       run: |
@@ -99,6 +124,13 @@ jobs:
   #     - name: Update Deployment Image
   #       run: |
   #         sed -i "s/VERSION_TAG/${{ github.sha }}/g" ./eks-manifest-files/app.yaml
+
+      - name: Validate Kubernetes Manifests with OPA
+        run: |
+          opa eval --input ./eks-manifest-files/app.yaml --data readonly-volumes.rego 'data.k8svolumes.violation'
+          opa eval --input ./eks-manifest-files/app.yaml --data restrict-ports.rego 'data.k8sports.violation'
+          opa eval --input ./eks-manifest-files/app.yaml --data deny-root.rego 'data.k8sroot.violation'
+
 
   #     - name: Deploy to EKS
   #       run: kubectl apply -f ./eks-manifest-files/app.yaml --validate=false # Path to your Kubernetes application manifest file/s
