@@ -1,6 +1,6 @@
 package k8svolumes
 
-violation[{"msg": msg}] {
+contains violation[{"msg": msg}] if {
     volume := input.review.object.spec.volumes[_]
     volume.persistentVolumeClaim
     not volume.persistentVolumeClaim.readOnly
