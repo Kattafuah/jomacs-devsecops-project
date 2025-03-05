@@ -1,7 +1,7 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sDenyRoot
+kind: K8sRoot
 metadata:
-  name: deny-root-containers
+  name: deny-root
 spec:
   match:
     kinds:

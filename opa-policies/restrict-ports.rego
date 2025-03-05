@@ -1,12 +1,8 @@
 package k8sports
 
-violation[{"msg": "Container is missing ports configuration."}] {
-    container := input.review.object.spec.containers[_]
-    not container.ports
-}
-
-violation[{"msg": "Containers must only expose ports above 1024."}] {
+violation[{"msg": msg}] {
     container := input.review.object.spec.containers[_]
     port := container.ports[_].containerPort
     port < 1024
+    msg := sprintf("Container '%s' must not expose port %d (ports below 1024 are not allowed).", [container.name, port])
 }

@@ -1,11 +1,7 @@
 package k8sroot
 
-violation[{"msg": "Container is missing securityContext."}] {
-    container := input.review.object.spec.containers[_]
-    not container.securityContext
-}
-
-violation[{"msg": "Containers must not run as root."}] {
+violation[{"msg": msg}] {
     container := input.review.object.spec.containers[_]
     container.securityContext.runAsUser == 0
+    msg := sprintf("Container '%s' must not run as root (runAsUser: 0).", [container.name])
 }

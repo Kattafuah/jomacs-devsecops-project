@@ -1,9 +1,11 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sRestrictPorts
+kind: K8sPorts
 metadata:
-  name: restrict-low-ports
+  name: restrict-ports
 spec:
   match:
     kinds:
       - apiGroups: [""]
         kinds: ["Pod"]
+  parameters:
+    message: "Containers must not expose ports below 1024."

@@ -1,18 +1,26 @@
 apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
-  name: k8sreadonlyvolumes
+  name: k8svolumes
 spec:
   crd:
     spec:
       names:
-        kind: K8sReadOnlyVolumes
+        kind: K8sVolumes
+      validation:
+        openAPIV3Schema:
+          properties:
+            message:
+              type: string
+              description: "Error message to display when the constraint is violated."
   targets:
     - target: admission.k8s.gatekeeper.sh
       rego: |
         package k8svolumes
-        violation[{"msg": "Mounted volumes must be read-only"}] {
+
+        violation[{"msg": msg}] {
             volume := input.review.object.spec.volumes[_]
-            volume.persistentVolumeClaim.claimName
+            volume.persistentVolumeClaim
             not volume.persistentVolumeClaim.readOnly
+            msg := sprintf("Volume '%s' must be read-only.", [volume.name])
         }
