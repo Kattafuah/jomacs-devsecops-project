@@ -63,7 +63,7 @@ jobs:
           path: opa-logs/opa-validation.log
 
 
-          
+
   #     # Install Docker Compose
   #     - name: Install Docker Compose
   #       run: |
@@ -124,13 +124,6 @@ jobs:
   #     - name: Update Deployment Image
   #       run: |
   #         sed -i "s/VERSION_TAG/${{ github.sha }}/g" ./eks-manifest-files/app.yaml
-
-      - name: Validate Kubernetes Manifests with OPA
-        run: |
-          opa eval --input ./eks-manifest-files/app.yaml --data readonly-volumes.rego 'data.k8svolumes.violation'
-          opa eval --input ./eks-manifest-files/app.yaml --data restrict-ports.rego 'data.k8sports.violation'
-          opa eval --input ./eks-manifest-files/app.yaml --data deny-root.rego 'data.k8sroot.violation'
-
 
   #     - name: Deploy to EKS
   #       run: kubectl apply -f ./eks-manifest-files/app.yaml --validate=false # Path to your Kubernetes application manifest file/s
