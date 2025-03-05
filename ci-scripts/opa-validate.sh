@@ -11,7 +11,7 @@ echo "Input file: $(realpath eks-manifest-files/app.yaml)"
 echo "Policies directory: $(realpath ./opa-policies/)"
 
 # Run OPA validation using all policies together
-opa eval --format=pretty --input eks-manifest-files/app.yaml --data ./opa-policies/ \
+opa eval --format=pretty --input eks-manifest-files/opa-test.yaml --data ./opa-policies/ \
     '{
         restrict_ports: data.k8sports.violation,
         deny_root: data.k8sroot.violation,
