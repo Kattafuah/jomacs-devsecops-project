@@ -10,6 +10,8 @@ mkdir -p opa-logs
 echo "Input file: $(realpath eks-manifest-files/app.yaml)"
 echo "Policies directory: $(realpath ./opa-policies/)"
 
+opa eval --data ./opa-policies/ --input eks-manifest-files/app.yaml 'data.k8s.*'
+
 # Run OPA validation using all policies together
 opa eval --format=pretty --input eks-manifest-files/opa-test.yaml --data ./opa-policies/ \
     '{
