@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Open Policy Agent (OPA)
         run: |
-          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64
+          curl -L -o opa https://openpolicyagent.org/downloads/v1.2.0/opa_linux_amd64_static
           chmod +x opa
           sudo mv opa /usr/local/bin/
 
