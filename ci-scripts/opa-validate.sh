@@ -3,9 +3,16 @@
 set -e  # Exit immediately on failure
 set -o pipefail  # Fail script if any command in a pipeline fails
 
-# Define directories and files
+# Define directories
 OPA_POLICY_DIR="./opa-policies"
-MANIFESTS=($(find eks-manifest-files -name "*.yaml"))  # Get all YAML files
+MANIFEST_DIR="./eks-manifest-files"
+
+# Find all YAML files in the eks-manifest-files directory
+MANIFEST_FILES=$(find "$MANIFEST_DIR" -name "*.yaml")
+
+# Debugging: List the files found
+echo "Found the following manifest files to validate: "
+echo "$MANIFEST_FILES"
 
 # Ensure OPA policies directory exists
 if [ ! -d "$OPA_POLICY_DIR" ]; then
@@ -14,38 +21,28 @@ if [ ! -d "$OPA_POLICY_DIR" ]; then
 fi
 
 # Ensure manifest files have correct permissions
-chmod -R +r eks-manifest-files/
+chmod -R +r "$MANIFEST_DIR"
 
-# Validate each manifest file
-for manifest in "${MANIFESTS[@]}"; do
-    echo "Validating $manifest..."
+# Run OPA evaluation with all the manifest files and the policies in the OPA policies directory
+result=$(opa eval --input "$MANIFEST_FILES" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
+    "data.kubernetes.validating.deny" --format json)
 
-    # Ensure the file exists and is readable
-    if [ ! -r "$manifest" ]; then
-        echo "Error: Cannot read $manifest. Check permissions."
-        exit 1
-    fi
+# Log the results
+echo "OPA evaluation results:"
+echo "$result" | jq .
 
-    # Run OPA evaluation with only .rego files
-    result=$(opa eval --input "$manifest" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
-      "data.kubernetes.validating.deny" --format json)
+# Check for policy violations
+violations=$(echo "$result" | jq '.result[0].expressions[0].value | length')
 
-    # Log the results in a human-readable format
-    echo "OPA validation results for $manifest:"
-    echo "$result" | jq '.'  # Print the result in a readable format
+if [[ "$violations" -gt 0 ]]; then
+    echo "❌ OPA validation failed"
+    exit 1  # Fail the workflow if violations exist
+else
+    echo "✅ OPA validation passed"
+fi
 
-    # Check for policy violations
-    violations=$(echo "$result" | jq '.result[0].expressions[0].value | length')
+echo "OPA validation completed successfully."
 
-    if [[ "$violations" -gt 0 ]]; then
-        echo "❌ OPA validation failed for $manifest"
-        exit 1  # Fail the workflow
-    else
-        echo "✅ OPA validation passed for $manifest"
-    fi
-done
-
-echo "All manifest files passed OPA validation."
 
 
 # #!/bin/bash
