@@ -5,13 +5,16 @@ set -o pipefail  # Fail script if any command in a pipeline fails
 
 # Define directories and files
 OPA_POLICY_DIR="./opa-policies"
-MANIFESTS= "./eks-manifest-files/app.yaml" #($(find eks-manifest-files -name "*.yaml"))
+MANIFESTS= ("./eks-manifest-files/app.yaml")  #($(find eks-manifest-files -name "*.yaml"))
 
 # Ensure OPA policies directory exists
 if [ ! -d "$OPA_POLICY_DIR" ]; then
     echo "Error: OPA policies directory '$OPA_POLICY_DIR' not found."
     exit 1
 fi
+
+# Ensure manifest files have correct permissions
+chmod -R +r eks-manifest-files/
 
 # Validate each manifest file
 for manifest in "${MANIFESTS[@]}"; do
