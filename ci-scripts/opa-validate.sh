@@ -28,8 +28,11 @@ for manifest in $MANIFEST_FILES; do
     echo "Validating $manifest..."
 
     # Run OPA evaluation with the manifest file and OPA policies
-    result=$(opa eval --input "$manifest" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
-        "data.kubernetes.validating.deny" --format json)
+    result=$(opa eval --input "$manifest" --data "$OPA_POLICY_DIR" "data.kubernetes.validating.deny" --format json)
+
+    # Log the raw results for this specific file
+    echo "Raw OPA evaluation result for $manifest:"
+    echo "$result"
 
     # Log the results for this specific file
     echo "OPA evaluation results for $manifest:"
@@ -48,7 +51,6 @@ for manifest in $MANIFEST_FILES; do
 done
 
 echo "OPA validation completed successfully."
-
 
 
 # #!/bin/bash
