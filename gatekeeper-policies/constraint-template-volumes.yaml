@@ -1,0 +1,21 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8sreadonlyvolumes
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sReadOnlyVolumes
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package kubernetes.validating.volumes
+
+        deny[msg] if {
+          input.request.kind.kind == "Pod"
+          some container in input.request.object.spec.containers
+          some volumeMount in container.volumeMounts
+          not volumeMount.readOnly
+          msg := sprintf("Volume '%v' must be mounted as read-only", [volumeMount.name])
+        }

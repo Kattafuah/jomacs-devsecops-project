@@ -1,8 +1,11 @@
-package kubernetes.admission
+package kubernetes.validating.security
 
-import rego.v1
+deny[msg] if {
+    input.request.kind.kind == "Pod"
 
-violation contains {"msg": "Containers must not run as root."} if {
-	container := input.review.object.spec.containers[_]
-	container.securityContext.runAsUser == 0
+    some container in input.request.object.spec.containers
+
+    # Check if securityContext exists and `runAsNonRoot` is either missing or set to `false`
+    not container.securityContext.runAsNonRoot
+    msg := sprintf("Container '%v' must not run as root", [container.name])
 }

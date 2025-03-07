@@ -1,11 +1,9 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sVolumes
+kind: K8sDenyRootUser
 metadata:
-  name: readonly-volumes
+  name: enforce-non-root-user
 spec:
   match:
     kinds:
       - apiGroups: [""]
         kinds: ["Pod"]
-  parameters:
-    message: "Mounted volumes must be read-only."

@@ -1,0 +1,8 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sImageRegistry
+metadata:
+  name: require-trusted-registries
+spec:
+  parameters:
+    trustedRegistries:
+      - "hooli.com/"

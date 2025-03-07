@@ -1,9 +1,12 @@
-package kubernetes.admission
+package kubernetes.validating.volumes
 
-import rego.v1
+deny[msg] if {
+    input.request.kind.kind == "Pod"
 
-violation contains {"msg": "Mounted volumes must be read-only."} if {
-	volume := input.review.object.spec.volumes[_]
-	volume.persistentVolumeClaim
-	not volume.persistentVolumeClaim.readOnly
+    some container in input.request.object.spec.containers
+    some volumeMount in container.volumeMounts
+
+    # Check if the volume mount has `readOnly` set to `false` or is missing the `readOnly` field
+    not volumeMount.readOnly
+    msg := sprintf("Volume '%v' must be mounted as read-only", [volumeMount.name])
 }

@@ -1,7 +1,7 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sRoot
+kind: K8sReadOnlyVolumes
 metadata:
-  name: deny-root
+  name: enforce-readonly-volumes
 spec:
   match:
     kinds:
