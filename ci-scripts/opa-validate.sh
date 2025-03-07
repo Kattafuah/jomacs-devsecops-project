@@ -5,7 +5,7 @@ set -o pipefail  # Fail script if any command in a pipeline fails
 
 # Define directories and files
 OPA_POLICY_DIR="./opa-policies"
-MANIFESTS=("./eks-manifest-files/app.yaml")  #($(find eks-manifest-files -name "*.yaml"))
+MANIFESTS=($(find eks-manifest-files -name "*.yaml"))  # Get all YAML files
 
 # Ensure OPA policies directory exists
 if [ ! -d "$OPA_POLICY_DIR" ]; then
@@ -19,17 +19,26 @@ chmod -R +r eks-manifest-files/
 # Validate each manifest file
 for manifest in "${MANIFESTS[@]}"; do
     echo "Validating $manifest..."
-    
+
+    # Ensure the file exists and is readable
+    if [ ! -r "$manifest" ]; then
+        echo "Error: Cannot read $manifest. Check permissions."
+        exit 1
+    fi
+
     # Run OPA evaluation with only .rego files
     result=$(opa eval --input "$manifest" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
       "data.kubernetes.validating.deny" --format json)
+
+    # Log the results in a human-readable format
+    echo "OPA validation results for $manifest:"
+    echo "$result" | jq '.'  # Print the result in a readable format
 
     # Check for policy violations
     violations=$(echo "$result" | jq '.result[0].expressions[0].value | length')
 
     if [[ "$violations" -gt 0 ]]; then
         echo "❌ OPA validation failed for $manifest"
-        echo "$result" | jq .
         exit 1  # Fail the workflow
     else
         echo "✅ OPA validation passed for $manifest"
