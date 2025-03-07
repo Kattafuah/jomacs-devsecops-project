@@ -1,7 +1,9 @@
-package k8svolumes
+package kubernetes.admission
 
-violation[{"msg": "Mounted volumes must be read-only."}] {
-    volume := input.review.object.spec.volumes[_]
-    volume.persistentVolumeClaim
-    not volume.persistentVolumeClaim.readOnly
+import rego.v1
+
+violation contains {"msg": "Mounted volumes must be read-only."} if {
+	volume := input.review.object.spec.volumes[_]
+	volume.persistentVolumeClaim
+	not volume.persistentVolumeClaim.readOnly
 }

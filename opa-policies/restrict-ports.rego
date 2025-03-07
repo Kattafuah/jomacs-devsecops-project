@@ -1,7 +1,9 @@
-package k8sports
+package kubernetes.admission
 
-violation[{"msg": "Containers must only expose ports above 1024."}] {
-    container := input.review.object.spec.containers[_]
-    port := container.ports[_].containerPort
-    port < 1024
+import rego.v1
+
+violation contains {"msg": "Containers must only expose ports above 1024."} if {
+	container := input.review.object.spec.containers[_]
+	port := container.ports[_].containerPort
+	port < 1024
 }

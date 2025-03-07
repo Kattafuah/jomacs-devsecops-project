@@ -1,6 +1,8 @@
-package k8sroot
+package kubernetes.admission
 
-violation[{"msg": "Containers must not run as root."}] {
-    container := input.review.object.spec.containers[_]
-    container.securityContext.runAsUser  == 0
+import rego.v1
+
+violation contains {"msg": "Containers must not run as root."} if {
+	container := input.review.object.spec.containers[_]
+	container.securityContext.runAsUser == 0
 }
