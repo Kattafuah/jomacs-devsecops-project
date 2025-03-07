@@ -5,7 +5,7 @@ set -o pipefail  # Fail script if any command in a pipeline fails
 
 # Define directories and files
 OPA_POLICY_DIR="./opa-policies"
-MANIFESTS= ("./eks-manifest-files/app.yaml")  #($(find eks-manifest-files -name "*.yaml"))
+MANIFESTS=("./eks-manifest-files/app.yaml")  #($(find eks-manifest-files -name "*.yaml"))
 
 # Ensure OPA policies directory exists
 if [ ! -d "$OPA_POLICY_DIR" ]; then
