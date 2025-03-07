@@ -23,23 +23,29 @@ fi
 # Ensure manifest files have correct permissions
 chmod -R +r "$MANIFEST_DIR"
 
-# Run OPA evaluation with all the manifest files and the policies in the OPA policies directory
-result=$(opa eval --input "$MANIFEST_FILES" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
-    "data.kubernetes.validating.deny" --format json)
+# Iterate through each manifest file and run OPA evaluation
+for manifest in $MANIFEST_FILES; do
+    echo "Validating $manifest..."
 
-# Log the results
-echo "OPA evaluation results:"
-echo "$result" | jq .
+    # Run OPA evaluation with the manifest file and OPA policies
+    result=$(opa eval --input "$manifest" --data "$(find $OPA_POLICY_DIR -name '*.rego')" \
+        "data.kubernetes.validating.deny" --format json)
 
-# Check for policy violations
-violations=$(echo "$result" | jq '.result[0].expressions[0].value | length')
+    # Log the results for this specific file
+    echo "OPA evaluation results for $manifest:"
+    echo "$result" | jq .
 
-if [[ "$violations" -gt 0 ]]; then
-    echo "❌ OPA validation failed"
-    exit 1  # Fail the workflow if violations exist
-else
-    echo "✅ OPA validation passed"
-fi
+    # Check for policy violations
+    violations=$(echo "$result" | jq '.result[0].expressions[0].value | length')
+
+    if [[ "$violations" -gt 0 ]]; then
+        echo "❌ OPA validation failed for $manifest"
+        echo "$result" | jq .
+        exit 1  # Fail the workflow if violations exist
+    else
+        echo "✅ OPA validation passed for $manifest"
+    fi
+done
 
 echo "OPA validation completed successfully."
 
