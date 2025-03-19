@@ -16,13 +16,13 @@ spec:
       - name: app
         image: nginx:latest
         securityContext:
-          runAsNonRoot: true
+          runAsNonRoot: false #this should cause the pipeline to fail when set as false
         ports:
-        - containerPort: 8080
+        - containerPort: 80 #this should cause the pipeline to fail when port is set below 1024
         volumeMounts:
         - mountPath: /data
           name: data-volume
-          readOnly: true
+          readOnly: false #this should cause the pipeline to fail when set as false
       volumes:
       - name: data-volume
         emptyDir: {}
