@@ -12,27 +12,38 @@ allow {
 
 # Check 1: No container runs as root
 no_root_container {
-    # Iterate over all containers in the spec
     containers := input.spec.template.spec.containers
-    all([container.securityContext.runAsNonRoot == true | container := containers[_]])
+    every container in containers {
+        container.securityContext.runAsNonRoot == true
+    }
 }
 
 # Check 2: Ports must be above 1024
 ports_above_1024 {
     containers := input.spec.template.spec.containers
-    all([port > 1024 | container := containers[_]; port := container.ports[_].containerPort])
+    every container in containers {
+        every port in container.ports {
+            port.containerPort > 1024
+        }
+    }
 }
 
 # Check 3: Mounted volumes must be read-only
 volumes_read_only {
     containers := input.spec.template.spec.containers
-    all([volume.readOnly == true | container := containers[_]; volume := container.volumeMounts[_]])
+    every container in containers {
+        every volume in container.volumeMounts {
+            volume.readOnly == true
+        }
+    }
 }
 
 # Violation messages for debugging
 violations[msg] {
-    not no_root_container
-    msg := "Container is running as root"
+    containers := input.spec.template.spec.containers
+    some container
+    not containers[container].securityContext.runAsNonRoot
+    msg := sprintf("Container %v is running as root", [containers[container].name])
 }
 
 violations[msg] {
