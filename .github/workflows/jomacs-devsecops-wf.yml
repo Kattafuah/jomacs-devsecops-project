@@ -53,44 +53,58 @@ jobs:
         run: |
           sudo snap install yq
 
-      # - name: Convert Deployment YAML to JSON
+      - name: Convert Deployment YAML to JSON
+        run: |
+          yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
+
+      # - name: Convert All YAMLs to JSON and Check Policies
       #   run: |
-      #     yq eval -o=json deployment.yaml > deployment.json
+      #     for yaml in ./eks-manifest-files/*.yaml; do
+      #       json="${yaml%.yaml}.json"
+      #       yq eval -o=json "$yaml" > "$json"
+      #       echo "Checking $yaml..."
+      #       opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
+      #       if grep -q "true" result.txt; then
+      #         echo "Policy check passed for $yaml!"
+      #       else
+      #         echo "Policy check failed for $yaml:"
+      #         opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations"
+      #         exit 1
+      #       fi
+      #     done
 
-      - name: Convert All YAMLs to JSON and Check Policies
-        run: |
-          for yaml in ./eks-manifest-files/*.yaml; do
-            json="${yaml%.yaml}.json"
-            yq eval -o=json "$yaml" > "$json"
-            echo "Checking $yaml..."
-            opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
-            if grep -q "true" result.txt; then
-              echo "Policy check passed for $yaml!"
-            else
-              echo "Policy check failed for $yaml:"
-              opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations"
-              exit 1
-            fi
-          done
+      # - name: Run OPA Policy Check for Multiple Manifests
+      #   run: |
+      #     mkdir -p logs
+      #     for yaml in ./eks-manifest-files/*.yaml; do
+      #       json="${yaml%.yaml}.json"
+      #       base=$(basename "$yaml" .yaml)
+      #       yq eval -o=json "$yaml" > "$json"
+      #       echo "Checking $yaml..."
+      #       opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > "logs/${base}_allow_result.log"
+      #       if grep -q "true" "logs/${base}_allow_result.log"; then
+      #         echo "Policy check passed for $yaml!"
+      #       else
+      #         echo "Policy check failed for $yaml:"
+      #         opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations" > "logs/${base}_violations.log"
+      #         cat "logs/${base}_violations.log"
+      #         exit 1
+      #       fi
+      #     done
 
-      - name: Run OPA Policy Check for Multiple Manifests
+      - name: Run OPA Policy Check
         run: |
-          mkdir -p logs
-          for yaml in ./eks-manifest-files/*.yaml; do
-            json="${yaml%.yaml}.json"
-            base=$(basename "$yaml" .yaml)
-            yq eval -o=json "$yaml" > "$json"
-            echo "Checking $yaml..."
-            opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > "logs/${base}_allow_result.log"
-            if grep -q "true" "logs/${base}_allow_result.log"; then
-              echo "Policy check passed for $yaml!"
-            else
-              echo "Policy check failed for $yaml:"
-              opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations" > "logs/${base}_violations.log"
-              cat "logs/${base}_violations.log"
-              exit 1
-            fi
-          done
+          # Evaluate the 'allow' rule
+          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
+          # Check if the result is 'true'
+          if grep -q "true" result.txt; then
+            echo "Policy check passed!"
+          else
+            echo "Policy check failed:"
+            # Output violations for debugging
+            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
+            exit 1
+          fi
 
       - name: Upload OPA Evaluation Logs
         if: always()
@@ -103,14 +117,14 @@ jobs:
       # - name: Run OPA Policy Check
       #   run: |
       #     # Evaluate the 'allow' rule
-      #     opa eval --input deployment.json --data security.rego --format pretty "data.security.allow" > result.txt
+      #     opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
       #     # Check if the result is 'true'
       #     if grep -q "true" result.txt; then
       #       echo "Policy check passed!"
       #     else
       #       echo "Policy check failed:"
       #       # Output violations for debugging
-      #       opa eval --input deployment.json --data security.rego --format pretty "data.security.violations"
+      #       opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
       #       exit 1
       #     fi
 
