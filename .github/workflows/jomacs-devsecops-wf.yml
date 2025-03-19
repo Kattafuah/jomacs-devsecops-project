@@ -63,23 +63,25 @@ jobs:
 
       - name: Run OPA Policy Check
         run: |
-          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt || { echo "OPA eval failed"; cat opa-test.json; exit 1; }
-          cat result.txt
-          if grep -q "true" result.txt; then
+          mkdir -p logs
+          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > logs/result.txt 2> logs/opa-error.txt || { echo "OPA eval failed"; cat opa-test.json > logs/input.json; cat logs/opa-error.txt; exit 1; }
+          cat logs/result.txt
+          if grep -q "true" logs/result.txt; then
             echo "Policy check passed!"
           else
             echo "Policy check failed:"
-            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
-            
+            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations" > logs/violations.txt
+            cat logs/violations.txt
             exit 1
           fi
+
       - name: Upload OPA Evaluation Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-            name: opa-evaluation-logs
-            path: logs/*
-            retention-days: 7 
+          name: opa-evaluation-logs
+          path: logs/*
+          retention-days: 7
 
   # policy-check:
   #   runs-on: ubuntu-latest
