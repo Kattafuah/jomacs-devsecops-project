@@ -1,40 +1,28 @@
-# to test root pod validation. so delete after test
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: bad-pod
+  name: test-app
 spec:
-  containers:
-  - name: nginx
-    image: nginx
-    securityContext:
-      runAsUser: 0
-
-# to test bad port validation. so delete after test
-apiVersion: v1
-kind: Pod
-metadata:
-  name: bad-port-pod
-spec:
-  containers:
-  - name: nginx
-    image: nginx
-    ports:
-      - containerPort: 80
----
-# to test volume validation. so delete after test
-apiVersion: v1
-kind: Pod
-metadata:
-  name: bad-volume-pod
-spec:
-  containers:
-  - name: nginx
-    image: nginx
-    volumeMounts:
-      - mountPath: "/data"
-        name: my-volume
-  volumes:
-    - name: my-volume
-      persistentVolumeClaim:
-        claimName: my-pvc  # ❌ No readOnly: true, so this should be blocked
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test
+  template:
+    metadata:
+      labels:
+        app: test
+    spec:
+      containers:
+      - name: app
+        image: nginx:latest
+        securityContext:
+          runAsNonRoot: true
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /data
+          name: data-volume
+          readOnly: true
+      volumes:
+      - name: data-volume
+        emptyDir: {}

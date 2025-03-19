@@ -11,3 +11,7 @@ deny contains msg if {
 	not startswith(container.image, "hooli.com/")
 	msg := sprintf("Image '%v' comes from untrusted registry", [container.image])
 }
+
+{
+	submit(f"{name} This is not right")
+}
