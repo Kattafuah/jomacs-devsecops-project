@@ -36,7 +36,7 @@ jobs:
 
       - name: Manual scan for passwords & Secret keys
         run: grep -r -e "password" -e "secret" -e "keys" .
-
+        
   policy-check:
     runs-on: ubuntu-latest
     steps:
@@ -48,14 +48,58 @@ jobs:
           curl -L -o opa https://openpolicyagent.org/downloads/v0.62.0/opa_linux_amd64_static
           chmod +x opa
           sudo mv opa /usr/local/bin/
+          opa version
 
-      - name: Install yq (for YAML to JSON conversion)
-        run: |
-          sudo snap install yq
+      - name: Install yq
+        run: sudo snap install yq
+
+      - name: Debug File Check
+        run: ls -l ./eks-manifest-files/opa-test.yaml ./opa-policies/security.rego
 
       - name: Convert Deployment YAML to JSON
         run: |
           yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
+          cat opa-test.json
+
+      - name: Run OPA Policy Check
+        run: |
+          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt || { echo "OPA eval failed"; cat opa-test.json; exit 1; }
+          cat result.txt
+          if grep -q "true" result.txt; then
+            echo "Policy check passed!"
+          else
+            echo "Policy check failed:"
+            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
+            
+            exit 1
+          fi
+      - name: Upload OPA Evaluation Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+            name: opa-evaluation-logs
+            path: logs/*
+            retention-days: 7 
+
+  # policy-check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  #     - name: Install OPA
+  #       run: |
+  #         curl -L -o opa https://openpolicyagent.org/downloads/v0.62.0/opa_linux_amd64_static
+  #         chmod +x opa
+  #         sudo mv opa /usr/local/bin/
+
+  #     - name: Install yq (for YAML to JSON conversion)
+  #       run: |
+  #         sudo snap install yq
+
+  #     - name: Convert Deployment YAML to JSON
+  #       run: |
+  #         yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
 
       # - name: Convert All YAMLs to JSON and Check Policies
       #   run: |
@@ -91,28 +135,6 @@ jobs:
       #         exit 1
       #       fi
       #     done
-
-      - name: Run OPA Policy Check
-        run: |
-          # Evaluate the 'allow' rule
-          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
-          # Check if the result is 'true'
-          if grep -q "true" result.txt; then
-            echo "Policy check passed!"
-          else
-            echo "Policy check failed:"
-            # Output violations for debugging
-            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
-            exit 1
-          fi
-
-      - name: Upload OPA Evaluation Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opa-evaluation-logs
-          path: logs/*
-          retention-days: 7 
 
       # - name: Run OPA Policy Check
       #   run: |
