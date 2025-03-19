@@ -1,5 +1,7 @@
 package security
 
+import future.keywords.every
+
 # Default deny unless all conditions pass
 default allow = false
 
