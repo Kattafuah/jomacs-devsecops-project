@@ -37,6 +37,52 @@ jobs:
       - name: Manual scan for passwords & Secret keys
         run: grep -r -e "password" -e "secret" -e "keys" .
         
+  # policy-check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  #     - name: Install OPA
+  #       run: |
+  #         curl -L -o opa https://openpolicyagent.org/downloads/v0.62.0/opa_linux_amd64_static
+  #         chmod +x opa
+  #         sudo mv opa /usr/local/bin/
+  #         opa version
+
+  #     - name: Install yq
+  #       run: sudo snap install yq
+
+  #     - name: Debug File Check
+  #       run: ls -l ./eks-manifest-files/opa-test.yaml ./opa-policies/security.rego
+
+  #     - name: Convert Deployment YAML to JSON
+  #       run: |
+  #         yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
+  #         cat opa-test.json
+
+  #     - name: Run OPA Policy Check
+  #       run: |
+  #         mkdir -p logs
+  #         opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > logs/result.txt 2> logs/opa-error.txt || { echo "OPA eval failed"; cat opa-test.json > logs/input.json; cat logs/opa-error.txt; exit 1; }
+  #         cat logs/result.txt
+  #         if grep -q "true" logs/result.txt; then
+  #           echo "Policy check passed!"
+  #         else
+  #           echo "Policy check failed:"
+  #           opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations" > logs/violations.txt
+  #           cat logs/violations.txt
+  #           exit 1
+  #         fi
+
+  #     - name: Upload OPA Evaluation Logs
+  #       if: always()
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: opa-evaluation-logs
+  #         path: logs/*
+  #         retention-days: 7
+
   policy-check:
     runs-on: ubuntu-latest
     steps:
@@ -54,24 +100,51 @@ jobs:
         run: sudo snap install yq
 
       - name: Debug File Check
-        run: ls -l ./eks-manifest-files/opa-test.yaml ./opa-policies/security.rego
+        run: ls -l ./eks-manifest-files/*.yaml ./opa-policies/security.rego
 
-      - name: Convert Deployment YAML to JSON
+      - name: Convert Manifest YAMLs to JSON
         run: |
-          yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
-          cat opa-test.json
+          mkdir -p json-files
+          for file in ./eks-manifest-files/*.yaml; do
+            filename=$(basename "$file" .yaml)
+            yq eval -o=json "$file" > "json-files/${filename}.json"
+            echo "Converted: $file"
+          done
+          ls -l json-files/
 
-      - name: Run OPA Policy Check
+      - name: Run OPA Policy Check on All Manifests
         run: |
           mkdir -p logs
-          opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > logs/result.txt 2> logs/opa-error.txt || { echo "OPA eval failed"; cat opa-test.json > logs/input.json; cat logs/opa-error.txt; exit 1; }
-          cat logs/result.txt
-          if grep -q "true" logs/result.txt; then
-            echo "Policy check passed!"
+          all_passed=true
+          for json_file in ./json-files/*.json; do
+            filename=$(basename "$json_file" .json)
+            echo "Evaluating: $filename"
+            
+            # Run OPA evaluation
+            opa eval --input "$json_file" --data ./opa-policies/security.rego --format pretty "data.security.allow" > "logs/${filename}-result.txt" 2> "logs/${filename}-error.txt" || {
+              echo "OPA eval failed for $filename"
+              cp "$json_file" "logs/${filename}-input.json"
+              cat "logs/${filename}-error.txt"
+              all_passed=false
+              continue
+            }
+            
+            # Check results
+            if grep -q "true" "logs/${filename}-result.txt"; then
+              echo "Policy check passed for $filename!"
+            else
+              echo "Policy check failed for $filename:"
+              opa eval --input "$json_file" --data ./opa-policies/security.rego --format pretty "data.security.violations" > "logs/${filename}-violations.txt"
+              cat "logs/${filename}-violations.txt"
+              all_passed=false
+            fi
+          done
+          
+          # Final status check
+          if [ "$all_passed" = true ]; then
+            echo "All policy checks passed!"
           else
-            echo "Policy check failed:"
-            opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations" > logs/violations.txt
-            cat logs/violations.txt
+            echo "One or more policy checks failed!"
             exit 1
           fi
 
@@ -82,109 +155,6 @@ jobs:
           name: opa-evaluation-logs
           path: logs/*
           retention-days: 7
-
-  # policy-check:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Install OPA
-  #       run: |
-  #         curl -L -o opa https://openpolicyagent.org/downloads/v0.62.0/opa_linux_amd64_static
-  #         chmod +x opa
-  #         sudo mv opa /usr/local/bin/
-
-  #     - name: Install yq (for YAML to JSON conversion)
-  #       run: |
-  #         sudo snap install yq
-
-  #     - name: Convert Deployment YAML to JSON
-  #       run: |
-  #         yq eval -o=json ./eks-manifest-files/opa-test.yaml > opa-test.json
-
-      # - name: Convert All YAMLs to JSON and Check Policies
-      #   run: |
-      #     for yaml in ./eks-manifest-files/*.yaml; do
-      #       json="${yaml%.yaml}.json"
-      #       yq eval -o=json "$yaml" > "$json"
-      #       echo "Checking $yaml..."
-      #       opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
-      #       if grep -q "true" result.txt; then
-      #         echo "Policy check passed for $yaml!"
-      #       else
-      #         echo "Policy check failed for $yaml:"
-      #         opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations"
-      #         exit 1
-      #       fi
-      #     done
-
-      # - name: Run OPA Policy Check for Multiple Manifests
-      #   run: |
-      #     mkdir -p logs
-      #     for yaml in ./eks-manifest-files/*.yaml; do
-      #       json="${yaml%.yaml}.json"
-      #       base=$(basename "$yaml" .yaml)
-      #       yq eval -o=json "$yaml" > "$json"
-      #       echo "Checking $yaml..."
-      #       opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.allow" > "logs/${base}_allow_result.log"
-      #       if grep -q "true" "logs/${base}_allow_result.log"; then
-      #         echo "Policy check passed for $yaml!"
-      #       else
-      #         echo "Policy check failed for $yaml:"
-      #         opa eval --input "$json" --data ./opa-policies/security.rego --format pretty "data.security.violations" > "logs/${base}_violations.log"
-      #         cat "logs/${base}_violations.log"
-      #         exit 1
-      #       fi
-      #     done
-
-      # - name: Run OPA Policy Check
-      #   run: |
-      #     # Evaluate the 'allow' rule
-      #     opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.allow" > result.txt
-      #     # Check if the result is 'true'
-      #     if grep -q "true" result.txt; then
-      #       echo "Policy check passed!"
-      #     else
-      #       echo "Policy check failed:"
-      #       # Output violations for debugging
-      #       opa eval --input opa-test.json --data ./opa-policies/security.rego --format pretty "data.security.violations"
-      #       exit 1
-      #     fi
-
-      # - name: Cleanup (optional)
-      #   if: always()
-      #   run: |
-      #     rm -f deployment.json result.txt
-
-  # opa-validation:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v3
-      
-  #     - name: Ensure script has executable permissions
-  #       run: chmod +x ./ci-scripts/opa-validate.sh
-
-  #     - name: Install Open Policy Agent (OPA)
-  #       run: |
-  #         curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
-  #         chmod +x opa
-  #         sudo mv opa /usr/local/bin/
-
-  #     - name: Run OPA validation
-  #       run: |
-  #         mkdir -p opa-logs
-  #         ./ci-scripts/opa-validate.sh | tee opa-logs/opa-validation.log
-
-  #     - name: Upload OPA Validation Logs
-  #       if: always()
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: opa-validation-logs
-  #         path: opa-logs/opa-validation.log
-
-
 
   #     # Install Docker Compose
   #     - name: Install Docker Compose
