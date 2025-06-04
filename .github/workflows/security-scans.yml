@@ -16,11 +16,30 @@ jobs:
   sast-scan:
     name: SAST Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -e package-lock.json ]; then
+            npm ci
+          elif [ -e yarn.lock ]; then
+            yarn install --frozen-lockfile
+          else
+            npm install
+          fi
 
       - name: Run Semgrep
         uses: semgrep/semgrep-action@v1
@@ -29,17 +48,19 @@ jobs:
             p/security-audit
             p/owasp-top-ten
             p/nodejs
+            p/javascript
           generateSarif: true
+          output: semgrep-results.sarif
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+          SEMGREP_TIMEOUT: 300
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v3.22.12
+        if: always()
         with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm ci
+          sarif_file: semgrep-results.sarif
+          category: 'sast/semgrep'
 
       - name: Run tests with coverage
         run: npm run test:cov
@@ -53,6 +74,7 @@ jobs:
           args: >
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'jomacs-devsecops-project' }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'jomacs' }}
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
 
   dependency-check:
     name: Dependency Scanning
@@ -74,7 +96,7 @@ jobs:
         run: npm audit --json --audit-level=high > npm-audit-report.json || true
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@v3.1.0
+        uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -86,7 +108,7 @@ jobs:
             --strict-out-of-sync=false
 
       - name: Monitor project in Snyk
-        uses: snyk/actions/node@v3.1.0
+        uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -106,6 +128,9 @@ jobs:
   container-scan:
     name: Container Scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -123,20 +148,16 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.18.0
+        uses: aquasecurity/trivy-action@v0.17.0
         with:
           image-ref: jomacs-app:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           timeout: '10m0s'
-
-      - name: Run Anchore Container Scan
-        uses: anchore/scan-action@v3.3.6
-        with:
-          image: jomacs-app:${{ github.sha }}
-          fail-build: false
-          severity-cutoff: high
+          scanners: 'vuln,secret,config'
+          hide-progress: false
+          exit-code: '1'
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3.22.12
@@ -144,6 +165,21 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'container-security'
+
+      - name: Run Anchore Container Scan
+        uses: anchore/scan-action@v3.3.6
+        with:
+          image: jomacs-app:${{ github.sha }}
+          fail-build: false
+          severity-cutoff: high
+          acs-report-enable: true
+
+      - name: Upload Anchore scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3.22.12
+        with:
+          sarif_file: 'anchore-results.sarif'
+          category: 'container-security/anchore'
 
   secret-scan:
     name: Secret Scanning
@@ -155,9 +191,20 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks
+        id: gitleaks
         uses: gitleaks/gitleaks-action@v2.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_REPORT_PATH: gitleaks-report.sarif
+        continue-on-error: true
+
+      - name: Upload Gitleaks results
+        if: always() && steps.gitleaks.outputs.result != ''
+        uses: github/codeql-action/upload-sarif@v3.22.12
+        with:
+          sarif_file: gitleaks-report.sarif
+          category: 'secret-scanning'
 
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@v3.63.7
