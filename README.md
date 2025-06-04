@@ -1,3 +1,96 @@
+# Jomacs DevSecOps Project
+
+## Repository Structure
+```
+.
+├── app/                    # Application source code
+├── infra/                  # Infrastructure as Code templates
+│   ├── terraform/         # Terraform configurations
+│   ├── kubernetes/        # Kubernetes manifests
+│   └── docker/           # Docker configurations
+├── docs/                  # Documentation and evidence
+│   ├── architecture/     # Architecture diagrams
+│   ├── runbooks/        # Incident response and operational runbooks
+│   └── evidence/        # Screenshots and compliance evidence
+├── ci-scripts/           # CI/CD pipeline scripts
+├── opa-policies/         # Open Policy Agent policies
+└── security/            # Security configurations and policies
+```
+
+## SOC 2 Control Mapping
+
+This project implements various security controls aligned with SOC 2 requirements:
+
+| Control ID | Description | Implementation |
+|------------|-------------|----------------|
+| CC7.1 | Security incidents are identified, reported, and addressed in a timely manner | - Incident Response Runbook<br>- Security monitoring<br>- Automated alerts |
+| CC7.2 | Changes to system components are authorized, designed, developed, configured, documented, tested, approved, and implemented | - CI/CD Pipeline<br>- Infrastructure as Code<br>- Policy enforcement |
+| CC6.1 | Logical access security software, infrastructure, and architectures are implemented | - Container security<br>- Network policies<br>- Access controls |
+| CC6.6 | System components are updated in a timely manner | - Dependency scanning<br>- Automated updates<br>- Vulnerability management |
+| CC8.1 | Software development lifecycle supports system security | - SAST/DAST integration<br>- Security testing<br>- Secure coding practices |
+
+## Security Scanning
+
+The project implements comprehensive security scanning in the CI/CD pipeline through the `.github/workflows/security-scans.yml` workflow. The following security checks are performed:
+
+### Static Application Security Testing (SAST)
+- **Semgrep**: Analyzes code for security vulnerabilities, bugs, and code quality issues
+  - Configured with security-audit, OWASP Top 10, and NodeJS rulesets
+  - Generates SARIF reports for GitHub Security tab integration
+- **SonarCloud**: Provides deep code analysis for:
+  - Code quality issues
+  - Security vulnerabilities
+  - Code smells
+  - Technical debt
+
+### Dependency Scanning
+- **NPM Audit**: Checks Node.js dependencies for known vulnerabilities
+- **Snyk**: Continuous monitoring of dependencies for:
+  - Known vulnerabilities
+  - License issues
+  - Fix recommendations
+
+### Container Security
+- **Trivy**: Comprehensive container scanning for:
+  - OS packages and software dependencies
+  - Known vulnerabilities
+  - Misconfigurations
+  - Secret detection
+- **Anchore**: Deep container analysis focusing on:
+  - Base image vulnerabilities
+  - Added package vulnerabilities
+  - Configuration issues
+  - Policy compliance
+
+### Secret Scanning
+- **Gitleaks**: Scans for hardcoded secrets and credentials
+- **TruffleHog**: Advanced secret detection with:
+  - Pattern matching
+  - Entropy analysis
+  - Commit history scanning
+
+### Running Security Scans Locally
+
+To run security scans locally before committing:
+
+```bash
+# Install pre-commit hooks
+npm install husky --save-dev
+npx husky install
+
+# Run SAST scan
+npm run security:sast
+
+# Run dependency scan
+npm run security:deps
+
+# Run container scan
+npm run security:container
+
+# Run all security checks
+npm run security:all
+```
+
 ## Description
 
 Broken Crystals is a benchmark application that uses modern technologies and implements a set of common security vulnerabilities.
@@ -60,8 +153,8 @@ Full configuration & usage examples can be found in our [demo project](https://g
 
 - **Broken JWT Authentication** - The application includes multiple endpoints that generate and validate several types of JWT tokens. The main login API, used by the UI, is utilizing one of the endpoints while others are available via direct call and described in Swagger.
 
-  - **No Algorithm bypass** - Bypasses the JWT authentication by using the “None” algorithm (implemented in main login and API authorization code).
-  - **RSA to HMAC** - Changes the algorithm to use a “HMAC” variation and signs with the public key of the application to bypass the authentication (implemented in main login and API authorization code).
+  - **No Algorithm bypass** - Bypasses the JWT authentication by using the "None" algorithm (implemented in main login and API authorization code).
+  - **RSA to HMAC** - Changes the algorithm to use a "HMAC" variation and signs with the public key of the application to bypass the authentication (implemented in main login and API authorization code).
   - **Invalid Signature** - Changes the signature of the JWT to something different and bypasses the authentication (implemented in main login and API authorization code).
   - **KID Manipulation** - Changes the value of the KID field in the Header of JWT to use either: (1) a static file that the application uses or (2) OS Command that echoes the key that will be signed or (3) SQL code that will return a key that will be used to sign the JWT (implemented in designated endpoint as described in Swagger).
   - **Brute Forcing Weak Secret Key** - Checks if common secret keys are used (implemented in designated endpoint as described in Swagger). The secret token is configurable via .env file and, by default, is 123.
@@ -72,13 +165,13 @@ Full configuration & usage examples can be found in our [demo project](https://g
 
 - **Brute Force Login** - Checks if the application user is using a weak password. The default setup contains user = _admin_ with password = _admin_
 
-- **Common Files** - Tries to find common files that shouldn’t be publicly exposed (such as “phpinfo”, “.htaccess”, “ssh-key.priv”, etc…). The application contains .htaccess and nginx.conf files under the client's root directory and additional files can be added by placing them under the public/public directory and running a build of the client.
+- **Common Files** - Tries to find common files that shouldn't be publicly exposed (such as "phpinfo", ".htaccess", "ssh-key.priv", etc...). The application contains .htaccess and nginx.conf files under the client's root directory and additional files can be added by placing them under the public/public directory and running a build of the client.
 
-- **Cookie Security** - Checks if the cookie has the “secure” and HTTP only flags. The application returns two cookies (session and bc-calls-counter cookie), both without secure and HttpOnly flags.
+- **Cookie Security** - Checks if the cookie has the "secure" and HTTP only flags. The application returns two cookies (session and bc-calls-counter cookie), both without secure and HttpOnly flags.
 
 - **Cross-Site Request Forgery (CSRF)**
 
-  - Checks if a form holds anti-CSRF tokens, misconfigured “CORS” and misconfigured “Origin” header - the application returns "Access-Control-Allow-Origin: \*" header for all requests. The behavior can be configured in the /main.ts file.
+  - Checks if a form holds anti-CSRF tokens, misconfigured "CORS" and misconfigured "Origin" header - the application returns "Access-Control-Allow-Origin: *" header for all requests. The behavior can be configured in the /main.ts file.
   - The same form with both authenticated and unauthenticated user - the _Email subscription_ UI forms can be used for testing this vulnerability.
   - Different form for an authenticated and unauthenticated user - the _Add testimonial_ form can be used for testing. The forms are only available to authenticated users.
 
@@ -152,8 +245,8 @@ Full configuration & usage examples can be found in our [demo project](https://g
 
 - **XPATH Injection** - The `/api/partners/*` endpoint contains the following XPATH injection vulnerabilities:
 
-  1. The endpoint GET `/api/partners/partnerLogin` is supposed to log in with the user's credentials in order to obtain account info. It's vulnerable to an XPATH injection using boolean based payloads. When exploited it'll retrieve data about other users as well. You can use `' or '1'='1` in the password field to exploit the EP.
-  2. The endpoint GET `/api/partners/searchPartners` is supposed to search partners' names by a given keyword. It's vulnerable to an XPATH injection using string detection payloads. When exploited, it can grant access to sensitive information like passwords and even lead to full data leak. You can use `')] | //password%00//` or `')] | //* | a[('` to exploit the EP.
+  1. The endpoint GET `/api/partners/partnerLogin` is supposed to log in with the user's credentials in order to obtain account info. It's vulnerable to an XPATH injection using boolean based payloads. When exploited it'll retrieve data about other users as well. You can use ' or '1'='1' in the password field to exploit the EP.
+  2. The endpoint GET `/api/partners/searchPartners` is supposed to search partners' names by a given keyword. It's vulnerable to an XPATH injection using string detection payloads. When exploited, it can grant access to sensitive information like passwords and even lead to full data leak. You can use ')] | //password%00//' or ')] | //* | a[(' to exploit the EP.
   3. The endpoint GET `/api/partners/query` is a raw XPATH injection endpoint. You can put whatever you like there. It is not referenced in the frontend, but it is an exposed API endpoint.
   4. Note: All endpoints are vulnerable to error based payloads.
 

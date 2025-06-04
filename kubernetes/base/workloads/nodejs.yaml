@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-service
+  namespace: default
+spec:
+  selector:
+    app: nodejs
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs
+  template:
+    metadata:
+      labels:
+        app: nodejs
+    spec:
+      serviceAccountName: jomacs-capstone-service-account
+      containers:
+        - name: nodejs
+          image: kattafuah/brokencrystals:nodejs-68f2c6aa154e65be24c61180f5581abbe8bb7da8
+          envFrom:
+            - configMapRef:
+                name: app-config
+          ports:
+            - containerPort: 3000 

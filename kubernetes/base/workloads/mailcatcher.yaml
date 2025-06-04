@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailcatcher-service
+  namespace: default
+spec:
+  selector:
+    app: mailcatcher
+  ports:
+    - name: http
+      protocol: TCP
+      port: 1080
+      targetPort: 1080
+    - name: smtp
+      protocol: TCP
+      port: 1025
+      targetPort: 1025
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailcatcher-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailcatcher
+  template:
+    metadata:
+      labels:
+        app: mailcatcher
+    spec:
+      serviceAccountName: jomacs-capstone-service-account
+      containers:
+        - name: mailcatcher
+          image: kattafuah/brokencrystals:mailcatcher-68f2c6aa154e65be24c61180f5581abbe8bb7da8
+          ports:
+            - containerPort: 1080
+            - containerPort: 1025 

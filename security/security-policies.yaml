@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: SecurityPolicies
+metadata:
+  name: devsecops-security-policies
+  
+# Network Security Policies
+networkPolicies:
+  default:
+    ingressRules:
+      - ports: [80, 443]
+        from:
+          - namespaceSelector:
+              matchLabels:
+                environment: production
+    egressRules:
+      - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+              except:
+                - 10.0.0.0/8
+                - 172.16.0.0/12
+                - 192.168.0.0/16
+
+# Pod Security Policies
+podSecurityPolicies:
+  restrictedPolicy:
+    privileged: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    allowedCapabilities: ['NET_BIND_SERVICE']
+    runAsUser:
+      rule: 'MustRunAsNonRoot'
+    runAsGroup:
+      rule: 'MustRunAs'
+      ranges:
+        - min: 1000
+          max: 65535
+    fsGroup:
+      rule: 'MustRunAs'
+      ranges:
+        - min: 1000
+          max: 65535
+    seLinux:
+      rule: 'RunAsAny'
+
+# Image Security Policies
+imageSecurityPolicies:
+  allowedRegistries:
+    - 'public.ecr.aws'
+    - '*.dkr.ecr.*.amazonaws.com'
+  imagePullPolicy: Always
+  scanOnPush: true
+  maxSeverity: CRITICAL
+  
+# Secret Management
+secretManagement:
+  provider: aws-secrets-manager
+  rotation:
+    enabled: true
+    interval: 90d
+  encryption:
+    algorithm: AES256
+    keyRotation: true
+
+# Compliance Requirements
+compliance:
+  soc2:
+    enabled: true
+    controls:
+      - id: CC7.1
+        name: "Security Incidents"
+        monitoring: true
+        alerting: true
+      - id: CC7.2
+        name: "Security Changes"
+        approvals: true
+        documentation: true
+      - id: CC6.1
+        name: "Access Control"
+        authentication: true
+        authorization: true
+      - id: CC6.6
+        name: "System Updates"
+        automation: true
+        scheduling: true
+
+# Monitoring and Alerting
+monitoring:
+  endpoints:
+    - /health
+    - /metrics
+  logging:
+    level: INFO
+    retention: 90d
+  alerts:
+    - name: HighSeverityVulnerability
+      condition: "severity >= HIGH"
+      channels: ["security-team", "devops-team"]
+    - name: UnauthorizedAccess
+      condition: "status_code == 403"
+      channels: ["security-team"]
+    - name: PodFailure
+      condition: "status == 'CrashLoopBackOff'"
+      channels: ["devops-team"]
+
+# Access Control
+accessControl:
+  authentication:
+    methods:
+      - type: IAM
+      - type: OIDC
+        provider: AWS
+  authorization:
+    rbac:
+      enabled: true
+      defaultRole: readonly
+    adminAccess:
+      requireMFA: true
+      sourceIPs: ["ALLOWED_IP_RANGES"] 

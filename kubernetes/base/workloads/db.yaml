@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-service
+  namespace: default
+spec:
+  selector:
+    app: db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-deployment
+  namespace: default
+  labels:
+    app: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      serviceAccountName: jomacs-capstone-service-account
+      volumes:
+        - name: pg-volume
+          configMap:
+            name: app-config
+        - name: init-script
+          configMap:
+            name: db-init-scripts-configmap
+        - name: dbcredentials
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "bc-db-credentials"
+      containers:
+        - name: db
+          image: kattafuah/brokencrystals:postgres-68f2c6aa154e65be24c61180f5581abbe8bb7da8
+          env:
+            - name: POSTGRES_DB
+              value: "bc"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DATABASE_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DATABASE_PASSWORD
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/pg.sql
+              subPath: pg.sql
+            - name: dbcredentials
+              mountPath: "/mnt/secrets-store"
+              readOnly: true 
