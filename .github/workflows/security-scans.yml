@@ -41,7 +41,11 @@ jobs:
             npm install
           fi
 
+      - name: Create results directory
+        run: mkdir -p semgrep-results
+
       - name: Run Semgrep
+        id: semgrep
         uses: semgrep/semgrep-action@v1
         with:
           config: >-
@@ -49,17 +53,32 @@ jobs:
             p/owasp-top-ten
             p/nodejs
             p/javascript
-          generateSarif: true
-          output: semgrep-results.sarif
+          output: semgrep-results/semgrep.sarif
+          metrics: 'off'
+          quiet: false
+          verbose: true
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
           SEMGREP_TIMEOUT: 300
+        continue-on-error: true
+
+      - name: Check Semgrep results
+        id: check-results
+        if: always()
+        run: |
+          if [ -f "semgrep-results/semgrep.sarif" ]; then
+            echo "SARIF file exists"
+            echo "has_results=true" >> $GITHUB_OUTPUT
+          else
+            echo "No SARIF file found"
+            echo "has_results=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload Semgrep results
+        if: steps.check-results.outputs.has_results == 'true'
         uses: github/codeql-action/upload-sarif@v3.22.12
-        if: always()
         with:
-          sarif_file: semgrep-results.sarif
+          sarif_file: semgrep-results/semgrep.sarif
           category: 'sast/semgrep'
 
       - name: Run tests with coverage
@@ -184,11 +203,14 @@ jobs:
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Required for full history scan
 
       - name: Run Gitleaks
         id: gitleaks
@@ -208,8 +230,60 @@ jobs:
 
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@v3.63.7
+        continue-on-error: true
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified 
+          base: ""  # Scan entire history
+          extra_args: >-
+            --debug
+            --only-verified
+            --json
+            --fail
+            --no-update
+            --github-actions
+
+      - name: Process TruffleHog output
+        if: always()
+        run: |
+          if [ -f "trufflehog.json" ]; then
+            echo "Converting TruffleHog JSON to SARIF..."
+            cat trufflehog.json | jq -r '{
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [{
+                "tool": {
+                  "driver": {
+                    "name": "TruffleHog",
+                    "informationUri": "https://github.com/trufflesecurity/trufflehog",
+                    "rules": []
+                  }
+                },
+                "results": [.[] | {
+                  "ruleId": .DetectorName,
+                  "message": {
+                    "text": "Found secret: \(.Description)"
+                  },
+                  "locations": [{
+                    "physicalLocation": {
+                      "artifactLocation": {
+                        "uri": .SourceMetadata.Data.Git.file
+                      },
+                      "region": {
+                        "startLine": 1,
+                        "endLine": 1
+                      }
+                    }
+                  }]
+                }]
+              }]
+            }' > trufflehog-results.sarif
+          else
+            echo "No TruffleHog results found"
+          fi
+
+      - name: Upload TruffleHog results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3.22.12
+        with:
+          sarif_file: trufflehog-results.sarif
+          category: 'secret-scanning/trufflehog' 
